@@ -12,7 +12,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw, ImageOps
 import torch
-from detection_utils import ROOT, load_photo
+from detection_utils import ROOT, load_photo, suppress_duplicate_boxes as nms
 
 PROMPTS = ["white cylindrical game piece", "white stone", "white plastic cylinder",
            "bottle cap", "white round button", "white checker piece"]
@@ -25,14 +25,6 @@ def iou(a, b):
     intersection = max(0, min(a[2], b[2])-max(a[0], b[0])) * max(0, min(a[3], b[3])-max(a[1], b[1]))
     union = (a[2]-a[0])*(a[3]-a[1]) + (b[2]-b[0])*(b[3]-b[1]) - intersection
     return intersection / max(union, 1e-6)
-
-
-def nms(items):
-    kept = []
-    for item in sorted(items, key=lambda x: x["score"], reverse=True):
-        if not any(iou(item["box"], other["box"]) > .45 for other in kept):
-            kept.append(item)
-    return kept
 
 
 def evaluate(items, truth):

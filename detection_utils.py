@@ -10,12 +10,9 @@ def load_photo(path, rectify=False):
     from PIL import Image
     photo = Image.open(path).convert("RGB")
     if rectify:
-        import cv2
         import numpy as np
-        config = json.loads((ROOT / "calibration/board.json").read_text(encoding="utf-8"))
-        if list(photo.size) != config["image_size"]:
-            raise ValueError("Image size differs from calibration")
-        photo = Image.fromarray(cv2.warpPerspective(np.array(photo), np.array(config["homography"]), tuple(config["warp_size"])))
+        from board_calibration import load_calibration, rectify_frame
+        photo = Image.fromarray(rectify_frame(np.asarray(photo), load_calibration()))
     return photo
 
 

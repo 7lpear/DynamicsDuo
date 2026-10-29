@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from detection_utils import ROOT, load_photo
 
 
 def main():
@@ -12,7 +13,7 @@ def main():
     parser.add_argument("--rectify", action="store_true", help="Use saved board calibration before inference")
     args = parser.parse_args()
     import torch
-    from PIL import Image, ImageDraw
+    from PIL import ImageDraw
     from transformers import AutoImageProcessor, AutoModelForObjectDetection
 
     if not 0 <= args.threshold <= 1:
@@ -23,14 +24,7 @@ def main():
     print(f"Loading {model_id}; first run downloads model files.", flush=True)
     processor = AutoImageProcessor.from_pretrained(model_id)
     model = AutoModelForObjectDetection.from_pretrained(model_id).to(args.device).eval()
-    photo = Image.open(args.image).convert("RGB")
-    if args.rectify:
-        import cv2
-        import numpy as np
-        config = json.loads((Path(__file__).resolve().parent / "calibration/board.json").read_text(encoding="utf-8"))
-        if list(photo.size) != config["image_size"]:
-            raise RuntimeError("Image size differs from calibration")
-        photo = Image.fromarray(cv2.warpPerspective(np.array(photo), np.array(config["homography"]), tuple(config["warp_size"])))
+    photo = load_photo(args.image, args.rectify)
     inputs = processor(images=photo, return_tensors="pt").to(args.device)
     with torch.inference_mode():
         predictions = model(**inputs)
@@ -52,7 +46,7 @@ def main():
     suffix = "_rectified" if args.rectify else ""
     if args.threshold != 0.3:
         suffix += f"_threshold_{args.threshold:g}"
-    output = Path(__file__).resolve().parent / "moku_results" / (args.image.stem + suffix)
+    output = ROOT / "moku_results" / (args.image.stem + suffix)
     output.mkdir(parents=True, exist_ok=True)
     photo.save(output / "detections.png")
     (output / "detections.json").write_text(json.dumps({

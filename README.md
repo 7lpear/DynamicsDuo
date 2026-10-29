@@ -33,10 +33,9 @@ python calibrate_board.py captures/새로저장한빈판사진.png
 | camera_test.py | 카메라 미리보기와 원본 사진 저장 |
 | calibrate_board.py | 네 교점을 클릭해 9×9 원근 보정 |
 | live_dino.py / dino_detector.py | 실시간 영상과 비동기 DINO 탐지 |
+| board_calibration.py / detection_utils.py | 공통 보정과 탐지 후처리 |
 | detect_grounding_dino.py | 사진 한 장의 DINO 탐지 |
-| detect_yolo_world.py / detect_moku.py | 공개 모델 비교 |
-| read_board.py | 빈 판과 밝기 차이를 비교하는 초기 방식 |
-| benchmark_detectors.py / validate_dino.py | 파라미터 비교와 변형 이미지 검사 |
+| experiments/ | YOLO·Moku 비교, 초기 방식, 파라미터 실험 |
 | test_follower_motion.py | SO-101 관절 확인과 동작 실험 |
 
 ## 문서와 현재 진행 상태
@@ -45,6 +44,10 @@ python calibrate_board.py captures/새로저장한빈판사진.png
 - [탐지 모델 비교 결과](detector_benchmark/REPORT.md)
 - [검증 이미지](detector_benchmark/validation_contact_sheet.png)
 - [로봇 동작과 제한 사항](MOTION_VIEWER.md)
+- [선택 실험 도구](experiments/README.md)
+
+실시간 실행과 사진 실행은 동일한 DinoDetector 엔진과 보정/후처리를 공유합니다.
+YOLO 비교에만 필요한 ultralytics는 experiments/requirements.txt로 분리했습니다.
 
 현재 원통형 백돌은 `bottle cap.` 프롬프트와 돌 크기/중복 필터로 실험했습니다.
 개수 3개 제한은 없습니다. 흑백 분류, 교점 배열 확정, 가림 처리, AI와 로봇 착수 연결은 후속 작업입니다.
@@ -64,6 +67,12 @@ python detect_grounding_dino.py captures/board_20261029_123855_712442.png --rect
 ```
 
 ## Git 작업
+
+하드웨어 없이 회귀 테스트를 실행할 수 있습니다.
+
+```powershell
+python -m unittest test_vision test_follower_demo test_follower_load test_motion_viewer
+```
 
 ```powershell
 git pull --ff-only

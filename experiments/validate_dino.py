@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
 from detection_utils import ROOT, load_photo, filter_stone_boxes, suppress_duplicate_boxes
-from benchmark_detectors import evaluate, GT
+from experiments.benchmark_detectors import evaluate, GT
 
 
 def main():

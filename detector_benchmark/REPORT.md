@@ -52,6 +52,6 @@ CPU 한 장 추론은 수 초이며 모델 로딩/전처리 시간은 별도다.
 
 ## 재현
 
-benchmark_detectors.py --backend yolo 또는 --backend dino: 전체 비교.
-validate_dino.py: 파생 이미지와 원시 검증 출력 생성.
-summarize_detector_tests.py: 저장된 출력에 크기 필터 적용 및 보고서 생성.
+python -m experiments.benchmark_detectors --backend yolo 또는 --backend dino: 전체 비교.
+python -m experiments.validate_dino: 파생 이미지와 원시 검증 출력 생성.
+python -m experiments.summarize_detector_tests: 저장된 출력에 크기 필터 적용 및 보고서 생성.

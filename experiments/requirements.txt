@@ -1,0 +1,2 @@
+# Optional YOLO comparison dependencies. Install after requirements-vision.txt.
+ultralytics==8.4.192

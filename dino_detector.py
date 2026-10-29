@@ -6,6 +6,8 @@ from detection_utils import filter_stone_boxes, suppress_duplicate_boxes
 
 class DinoDetector:
     def __init__(self, device="cpu", prompt="bottle cap.", threshold=.25, text_threshold=.15):
+        if not prompt.strip() or not 0 <= threshold <= 1 or not 0 <= text_threshold <= 1:
+            raise ValueError("Prompt must not be empty and thresholds must be 0..1")
         import torch
         from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
         if device == "cuda" and not torch.cuda.is_available():
@@ -22,7 +24,7 @@ class DinoDetector:
         self.processor = AutoProcessor.from_pretrained(self.model_id)
         self.model = AutoModelForZeroShotObjectDetection.from_pretrained(self.model_id).to(device).eval()
 
-    def detect(self, photo):
+    def detect(self, photo, stone_filter=True):
         started = time.perf_counter()
         inputs = self.processor(images=photo, text=self.prompt, return_tensors="pt").to(self.device)
         with self.torch.inference_mode():
@@ -35,7 +37,7 @@ class DinoDetector:
         raw = [{"label": str(label), "score": float(score), "box": box.detach().cpu().tolist()}
                for label, score, box in zip(labels, result["scores"], result["boxes"])]
         # No fixed object count or top-N truncation: retain every valid detection.
-        sized = filter_stone_boxes(raw)
+        sized = filter_stone_boxes(raw) if stone_filter else raw
         items = suppress_duplicate_boxes(sized)
         self.last_counts = {"above_threshold": len(raw), "after_size_filter": len(sized),
                             "after_duplicate_removal": len(items)}

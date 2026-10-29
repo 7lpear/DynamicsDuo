@@ -10,6 +10,7 @@ import time
 import cv2
 import numpy as np
 from detection_utils import ROOT
+from board_calibration import load_calibration, rectify_frame
 
 
 def worker(jobs, results, ready, stop, args):
@@ -118,10 +119,10 @@ def main():
         parser.error("Duration and result count must be nonnegative")
     if args.no_window and not (args.duration or args.stop_after_results):
         parser.error("Headless mode requires --duration or --stop-after-results")
-    config = json.loads((ROOT / "calibration/board.json").read_text(encoding="utf-8"))
+    config = load_calibration()
     if config["grid_spacing"] != 100:
         parser.error("Stone size filter requires calibration with 100px grid spacing")
-    matrix, size = np.array(config["homography"]), tuple(config["warp_size"])
+    matrix = np.array(config["homography"])
     inverse = np.linalg.inv(matrix)
     camera = None
     source = None
@@ -158,9 +159,7 @@ def main():
                     raise RuntimeError("Camera frame read failed")
             else:
                 frame = source
-            if [frame.shape[1], frame.shape[0]] != config["image_size"]:
-                raise RuntimeError(f"Camera resolution {frame.shape[1]}x{frame.shape[0]} differs from calibration {config['image_size']}")
-            board = cv2.warpPerspective(frame, matrix, size)
+            board = rectify_frame(frame, config)
             frame_id += 1
             try:
                 result = results.get_nowait()

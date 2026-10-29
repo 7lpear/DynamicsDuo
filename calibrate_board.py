@@ -67,7 +67,12 @@ def main():
             if key == ord("s") and matrix is not None:
                 output = Path(__file__).resolve().parent / "calibration"
                 output.mkdir(exist_ok=True)
-                data = {"board_size": 9, "source_image": str(args.image.resolve()),
+                image_path = args.image.resolve()
+                try:
+                    source_image = image_path.relative_to(output.parent).as_posix()
+                except ValueError:
+                    source_image = str(image_path)
+                data = {"board_size": 9, "source_image": source_image,
                         "image_size": [width, height], "source_points": points,
                         "homography": matrix.tolist(), "warp_size": [901, 901],
                         "grid_margin": 50, "grid_spacing": 100,

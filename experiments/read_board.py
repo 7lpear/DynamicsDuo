@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent
+from detection_utils import ROOT
 
 
 def read_image(path):
