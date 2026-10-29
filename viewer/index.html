@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SO-101 실시간 동작</title>
+<link rel="icon" href="data:,">
+<style>
+*{box-sizing:border-box}body{margin:0;background:#101923;color:#e7eef7;font-family:system-ui,sans-serif}header{padding:22px 28px;border-bottom:1px solid #2b3a4a}h1{font-size:22px;margin:0 0 8px}p{margin:6px 0;color:#a7b8ca}main{display:grid;grid-template-columns:1fr 300px;height:calc(100vh - 130px)}#scene{position:relative;min-height:400px}aside{padding:24px;border-left:1px solid #2b3a4a}#status{color:#71dbb3;line-height:1.6}table{width:100%;margin-top:24px;border-collapse:collapse;font-size:14px}td{padding:10px 0;border-bottom:1px solid #2b3a4a}td:last-child{text-align:right;font-variant-numeric:tabular-nums}button{margin-top:22px;background:#294457;border:0;color:white;padding:10px 16px;border-radius:8px;cursor:pointer}#error{color:#ffb499;white-space:pre-wrap}canvas{display:block} @media(max-width:750px){main{grid-template-columns:1fr;height:auto}aside{border-left:0}#scene{height:60vh}}
+</style>
+<script type="importmap">{"imports":{"three":"/vendor/three.module.js"}}</script>
+<header><h1>SO-101 · 팔로워암 동작 보기</h1><p>실제 관절 위치를 표시합니다 · 드래그: 회전 / 휠: 확대 / 우클릭: 이동</p></header>
+<main><div id="scene"></div><aside><div id="status">모델을 불러오는 중…</div><p id="source"></p><table id="positions"></table><button id="reset">시점 초기화</button><p>화면에는 로봇 제어 기능이 없습니다.<br>중단: 실행 터미널에서 Ctrl+C</p><p id="error"></p></aside></main>
+<script type="module" src="/app.js"></script></html>
