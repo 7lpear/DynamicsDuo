@@ -196,7 +196,8 @@ class StoneTracker:
         if circles is None:
             return evidence
         yy, xx = np.ogrid[:self.side, :self.side]
-        for x, y, radius in circles[0]:
+        # Accept both OpenCV 4's (1, N, 3) and OpenCV 5's (N, 3).
+        for x, y, radius in np.asarray(circles).reshape(-1, 3):
             distances = np.linalg.norm(self.grid - [x, y], axis=2)
             row, col = np.unravel_index(distances.argmin(), distances.shape)
             if distances[row, col] > spacing * 0.28:

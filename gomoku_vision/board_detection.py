@@ -13,7 +13,8 @@ def _families(gray, thresholds=(45, 130)):
     groups = [[], []]
     if segments is None:
         return groups
-    for x1, y1, x2, y2 in segments[:, 0].astype(float):
+    # OpenCV 4 returns (N, 1, 4); OpenCV 5 returns (N, 4).
+    for x1, y1, x2, y2 in np.asarray(segments).reshape(-1, 4).astype(float):
         dx, dy = x2 - x1, y2 - y1
         length = np.hypot(dx, dy)
         line = np.array([y1 - y2, x2 - x1, x1 * y2 - x2 * y1]) / length
