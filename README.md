@@ -1,7 +1,7 @@
 # DynamicsDuo
 2026-2 Hongik Challenge
 
-SO-101 로봇 제어 실험과 C920e 기반 9×9 오목판 비전 프로젝트.
+SO-101 로봇 제어 실험과 C920/C920e 기반 9×9 오목판 비전 프로젝트.
 
 ## 환경과 실행
 
@@ -35,11 +35,13 @@ python calibrate_board.py captures/새로저장한빈판사진.png
 | live_dino.py / dino_detector.py | 실시간 영상과 비동기 DINO 탐지 |
 | board_calibration.py / detection_utils.py | 공통 보정과 탐지 후처리 |
 | detect_grounding_dino.py | 사진 한 장의 DINO 탐지 |
+| gomoku_vision/ | OpenCV 격자 자동 검출, 실시간 돌 유무·흑백 구분 |
 | experiments/ | YOLO·Moku 비교, 초기 방식, 파라미터 실험 |
 | test_follower_motion.py | SO-101 관절 확인과 동작 실험 |
 
 ## 문서와 현재 진행 상태
 
+- [OpenCV 오목판·흑백 돌 인식 사용법](gomoku_vision/README.md)
 - [실시간 탐지 사용법](LIVE_DINO.md)
 - [탐지 모델 비교 결과](detector_benchmark/REPORT.md)
 - [검증 이미지](detector_benchmark/validation_contact_sheet.png)
@@ -49,8 +51,13 @@ python calibrate_board.py captures/새로저장한빈판사진.png
 실시간 실행과 사진 실행은 동일한 DinoDetector 엔진과 보정/후처리를 공유합니다.
 YOLO 비교에만 필요한 ultralytics는 experiments/requirements.txt로 분리했습니다.
 
-현재 원통형 백돌은 `bottle cap.` 프롬프트와 돌 크기/중복 필터로 실험했습니다.
-개수 3개 제한은 없습니다. 흑백 분류, 교점 배열 확정, 가림 처리, AI와 로봇 착수 연결은 후속 작업입니다.
+기존 DINO 경로에서 원통형 백돌은 `bottle cap.` 프롬프트와 돌 크기/중복 필터로 실험했습니다.
+개수 3개 제한은 없습니다. DINO 경로의 흑백 분류, 교점 배열 확정, 가림 처리는 후속 작업입니다.
+
+별도 `gomoku_vision/` 도구는 학습 모델 없이 격자를 찾고 빈 판 기준과 원형 경계를
+이용해 돌 유무·흑백을 판별합니다. 해당 폴더의 별도 가상환경에서 실행하세요.
+판·카메라 이동 후에는 격자와 빈 판 기준을 다시 설정해야 합니다.
+강화학습 에이전트 및 실제 로봇 착수 연결은 아직 구현하지 않았습니다.
 동일 배치에서 파생한 이미지의 성공은 새 배치나 실제 대국 성능을 보증하지 않습니다.
 
 ## 샘플과 로컬 파일
