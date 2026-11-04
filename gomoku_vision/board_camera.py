@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from board_detection import detect_board
 from stone_tracking import StoneTracker
+from camera_io import BACKENDS, open_camera, resolve_backend, read_image, write_image, require_gui
 
 ROOT = Path(__file__).resolve().parent
 CONFIG = ROOT / "calibration.json"
@@ -67,6 +68,8 @@ def label(frame, message, y=26):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--camera", type=int, default=0, help="Camera index (default: 0)")
+    parser.add_argument("--backend", choices=BACKENDS, default="auto",
+                        help="auto selects DirectShow on Windows or AVFoundation on macOS")
     parser.add_argument("--size", type=int, choices=SIZES, default=None,
                         help="Intersection count per side: an 8x8-cell board uses --size 9")
     parser.add_argument("--reset", action="store_true", help="Ignore saved calibration")
@@ -75,6 +78,17 @@ def main():
     parser.add_argument("--resume-baseline", action="store_true",
                         help="Reuse diagnostic baseline + calibration ONLY if board/camera have not moved")
     args = parser.parse_args()
+    try:
+        backend_name, _ = resolve_backend(args.backend)
+    except ValueError as error:
+        parser.error(str(error))
+    if args.camera < 0:
+        parser.error("--camera must be nonnegative")
+    try:
+        require_gui()
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
+        return 1
     size = args.size or 9
     points = []
     saved = None
@@ -86,13 +100,15 @@ def main():
         parser.error("No saved diagnostic calibration; capture an empty board first")
     if config_path.exists() and not args.reset:
         try:
-            saved = json.loads(config_path.read_text())
+            saved = json.loads(config_path.read_text(encoding="utf-8"))
             normalized = np.asarray(saved["corners"], dtype=np.float32)
             if (normalized.shape != (4, 2) or not np.isfinite(normalized).all()
                     or np.any(normalized < 0) or np.any(normalized > 1)
                     or saved["size"] not in SIZES):
                 raise ValueError("Invalid calibration")
-            if saved["camera"] != args.camera or (args.size is not None and saved["size"] != args.size):
+            if (saved.get("platform", sys.platform) != sys.platform
+                    or saved.get("backend", backend_name) != backend_name
+                    or saved["camera"] != args.camera or (args.size is not None and saved["size"] != args.size)):
                 saved = None
             elif args.size is None:
                 size = saved["size"]
@@ -102,20 +118,15 @@ def main():
     if args.resume_baseline:
         if saved is None:
             parser.error("Saved baseline calibration does not match camera or grid size")
-        resume_reference = cv2.imread(str(ROOT / "diagnostics/latest_empty_reference.png"), cv2.IMREAD_GRAYSCALE)
+        resume_reference = read_image(ROOT / "diagnostics/latest_empty_reference.png", cv2.IMREAD_GRAYSCALE)
         if resume_reference is None or resume_reference.shape != (400, 400):
             parser.error("Saved empty reference is missing or invalid")
 
-    backend = cv2.CAP_AVFOUNDATION if sys.platform == "darwin" else cv2.CAP_ANY
-    cap = cv2.VideoCapture(args.camera, backend)
-    if not cap.isOpened():
-        cap.release()
-        print("Cannot open camera. Try --camera 1 or --camera 2.\n"
-              "On macOS, allow camera access for the launching app in System Settings.\n"
-              "Close QuickTime or other apps using the camera.", file=sys.stderr)
+    try:
+        cap = open_camera(args.camera, args.backend)
+    except RuntimeError as error:
+        print(str(error), file=sys.stderr)
         return 1
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
     status = "Looking for an empty board. A: retry detection, M: manual corners"
     last_shape = None
     auto_pending = True
@@ -157,6 +168,8 @@ def main():
                     break
                 continue
             failures = 0
+            if frame_count == 0:
+                print(f"First frame received: {frame.shape[1]}x{frame.shape[0]}", flush=True)
             height, width = frame.shape[:2]
             scale = min(1.0, 1100 / width, 650 / height)
             frame = cv2.resize(frame, (round(width * scale), round(height * scale)))
@@ -216,12 +229,13 @@ def main():
                     folder = ROOT / "diagnostics"
                     try:
                         folder.mkdir(exist_ok=True)
-                        if not cv2.imwrite(str(folder / "latest_empty_reference.png"),
+                        if not write_image(folder / "latest_empty_reference.png",
                                            np.clip(tracker.reference, 0, 255).astype(np.uint8)):
                             raise OSError("Could not write empty-board reference")
                         (folder / "latest_calibration.json").write_text(json.dumps({
                             "size": size, "camera": args.camera, "aspect": width / height,
-                            "corners": (np.asarray(points) / [w - 1, h - 1]).tolist()}, indent=2) + "\n")
+                            "platform": sys.platform, "backend": backend_name,
+                            "corners": (np.asarray(points) / [w - 1, h - 1]).tolist()}, indent=2) + "\n", encoding="utf-8")
                     except OSError as error:
                         print(f"Could not save diagnostic reference: {error}", file=sys.stderr)
                 corrected = annotate_grid(warped, grid)
@@ -303,9 +317,11 @@ def main():
                 args.camera = (args.camera + 1) % 4
                 points.clear()
                 auto_pending = True
-                cap = cv2.VideoCapture(args.camera, backend)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+                try:
+                    cap = open_camera(args.camera, args.backend)
+                except RuntimeError as error:
+                    print(str(error), file=sys.stderr)
+                    return 1
                 status = f"Camera {args.camera}. Looking for grid..."
                 print(f"Switched to camera {args.camera}")
             elif key == ord("d"):
@@ -316,10 +332,10 @@ def main():
                     if warped is not None:
                         pictures["latest_board"] = warped
                     for name, picture in pictures.items():
-                        if not cv2.imwrite(str(folder / f"{name}.png"), picture):
+                        if not write_image(folder / f"{name}.png", picture):
                             raise OSError(f"Could not save {name}")
                     if tracker is not None:
-                        (folder / "latest_state.json").write_text(json.dumps(tracker.state(), indent=2) + "\n")
+                        (folder / "latest_state.json").write_text(json.dumps(tracker.state(), indent=2) + "\n", encoding="utf-8")
                     status = "Saved diagnostic images and tracking state in diagnostics/."
                     print(status)
                 except OSError as error:
@@ -329,18 +345,19 @@ def main():
                     status = "Select all four corners before saving."
                     continue
                 config = {"size": size, "camera": args.camera, "aspect": width / height,
+                          "platform": sys.platform, "backend": backend_name,
                           "corners": (np.asarray(points) / [w - 1, h - 1]).tolist()}
                 folder = ROOT / "captures"
                 folder.mkdir(exist_ok=True)
                 stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
                 try:
-                    CONFIG.write_text(json.dumps(config, indent=2) + "\n")
+                    CONFIG.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
                     for name, picture in (("camera", frame), ("board", warped), ("grid", corrected)):
-                        if not cv2.imwrite(str(folder / f"{stamp}_{name}.png"), picture):
+                        if not write_image(folder / f"{stamp}_{name}.png", picture):
                             raise OSError(f"Could not save {name} image")
                     if tracker is not None:
                         (folder / f"{stamp}_state.json").write_text(
-                            json.dumps(tracker.state(), indent=2) + "\n")
+                            json.dumps(tracker.state(), indent=2) + "\n", encoding="utf-8")
                     status = "Saved calibration and camera/board/grid PNG images."
                     print(f"{status}\n{folder}")
                 except OSError as error:
@@ -351,7 +368,10 @@ def main():
                 break
     finally:
         cap.release()
-        cv2.destroyAllWindows()
+        try:
+            cv2.destroyAllWindows()
+        except cv2.error:
+            pass  # Preserve the original error when GUI initialization failed.
     return 0
 
 

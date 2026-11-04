@@ -1,5 +1,17 @@
 # 오목판 카메라 인식
 
+Windows의 Conda `so-arm-101` 환경에서 실행할 때는 저장소 루트에서 다음을 사용합니다.
+
+```powershell
+conda activate so-arm-101
+python gomoku_vision/board_camera.py --camera 1 --size 9 --reset
+```
+
+이미 `gomoku_vision` 폴더에 있다면 `python board_camera.py ...`로 실행합니다.
+Windows 기본 입력 방식은 DirectShow입니다. 카메라 번호는 실제 연결 상태에 따라 다릅니다.
+`Opening camera` → `Camera opened` → `First frame received` 로그로 시작 단계를 확인할 수 있습니다.
+`--backend auto`는 OS에 맞는 방식을 선택합니다. Windows에서는 `--backend msmf`로 변경할 수 있습니다.
+
 Logitech C920 등 USB 카메라 영상에서 빈 판의 격자선을 자동 검출하고,
 원근을 보정하여 9×9, 15×15 또는 19×19 교차점을 표시합니다.
 **현재 사용하는 8×8칸 판은 9×9교차점이므로 `--size 9`입니다.**
@@ -9,30 +21,35 @@ Logitech C920 등 USB 카메라 영상에서 빈 판의 격자선을 자동 검�
 
 ## 실행
 
-아래 명령은 DynamicsDuo 저장소 루트에서 시작합니다. 이 도구는 기존 DINO 환경과
-OpenCV 버전 요구사항이 다르므로 별도 가상환경에서 실행하세요.
+Windows와 macOS 모두 Conda `so-arm-101` 환경에서 같은 명령을 사용합니다.
+이 도구는 OpenCV 4/5와 NumPy 2를 지원합니다. 설치된 Windows 환경은 추가 설치가 필요 없습니다.
+아래 명령은 DynamicsDuo 저장소 루트에서 시작합니다.
 
 ```sh
-cd gomoku_vision
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python board_camera.py --camera 0 --size 9 --reset
+conda activate so-arm-101
+python gomoku_vision/board_camera.py --camera 1 --size 9 --reset
 ```
 
-설치가 끝난 뒤에는 이 폴더에서 마지막 명령만 실행하면 됩니다.
+새 Mac에서 Conda 환경이 아직 없다면 먼저 생성합니다. DINO 없이 이 OpenCV 도구만 실행하는 최소 환경입니다.
 
-Windows PowerShell에서는 이 폴더로 이동한 뒤 다음을 실행합니다.
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe board_camera.py --camera 0 --size 9 --reset
+```sh
+conda create -n so-arm-101 python=3.12
+conda activate so-arm-101
+python -m pip install -r gomoku_vision/requirements.txt
 ```
 
-macOS Python 3.13과 OpenCV 4.14에서 검증했습니다. Windows 실시간 카메라 실행은 미검증입니다.
+`--backend auto`는 Windows에서 DirectShow, macOS에서 AVFoundation을 선택합니다.
+명시적으로 지정할 때는 Windows: `--backend dshow`/`--backend msmf`, Mac: `--backend avfoundation`입니다.
+다른 OS 전용 backend를 지정하면 카메라를 열기 전에 안내하고 종료합니다.
+카메라 번호는 OS/USB 연결마다 다르므로 1번이 항상 C920인 것은 아닙니다.
+Windows OpenCV 5에서 테스트와 카메라 프레임 수신을 확인했습니다.
+이번 플랫폼 분기 변경은 모의 테스트로 검증했으며 macOS 실제 카메라 검증은 아직 필요합니다.
 macOS에서 카메라 권한을 요청하면 허용하세요. 영상이 나오지 않으면
 시스템 설정 → 개인정보 보호 및 보안 → 카메라에서 실행한 앱의 권한을 확인하고,
 QuickTime 등 카메라를 사용하는 다른 앱을 종료하세요.
+OS/카메라 입력 방식이 다른 저장 보정값은 자동으로 재사용하지 않습니다.
+컴퓨터를 옮기면 `--reset`으로 격자를 잡고, 빈 판에서 `B`로 기준을 새로 수집하세요.
+보정값/진단 자료는 각 컴퓨터의 로컬 파일이며 Git에서 제외됩니다.
 
 ## 자동 인식
 
@@ -83,7 +100,7 @@ QuickTime 등 카메라를 사용하는 다른 앱을 종료하세요.
 프로그램 시작 시 빈 판 기준까지 자동 수집하려면 **실제 판을 비운 상태에서** 실행하세요.
 
 ```sh
-.venv/bin/python board_camera.py --camera 0 --size 9 --reset --capture-empty
+python gomoku_vision/board_camera.py --camera 1 --size 9 --reset --capture-empty
 ```
 
 기준 영상은 실행 중 메모리에 유지합니다. 재실행하거나 격자를 다시 잡으면 `B`로
@@ -115,11 +132,11 @@ QuickTime 등 카메라를 사용하는 다른 앱을 종료하세요.
 중앙과 가장자리에서 격자가 모두 맞는지 확인하세요.
 
 ```sh
-.venv/bin/python board_camera.py --camera 1 --size 19 --reset
+python gomoku_vision/board_camera.py --camera 1 --size 19 --reset
 ```
 
 ## 검증
 
 ```sh
-.venv/bin/python -m unittest -v test_board_detection.py test_stone_tracking.py
+python -m unittest discover -s gomoku_vision -p "test_*.py" -v
 ```
