@@ -1,0 +1,2 @@
+# Optional headless viewer verification; uses an installed Microsoft Edge.
+playwright==1.63.0

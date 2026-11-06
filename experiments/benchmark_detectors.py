@@ -7,10 +7,7 @@ import argparse
 import inspect
 import json
 import time
-from pathlib import Path
-
-import numpy as np
-from PIL import Image, ImageDraw, ImageOps
+from PIL import ImageDraw, ImageOps
 import torch
 from detection_utils import ROOT, load_photo, suppress_duplicate_boxes as nms
 

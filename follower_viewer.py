@@ -1,5 +1,6 @@
 """Local read-only telemetry server. Never opens a robot serial port."""
 import json
+import math
 import threading
 import time
 import webbrowser
@@ -44,14 +45,19 @@ class FollowerViewer:
         if open_browser:
             webbrowser.open(self.url)
 
-    def publish(self, positions, status="Moving", source="actual"):
+    def publish(self, positions, status="Moving", source="actual", command_positions=None, diagnostics=None, diagnostics_timestamp=None):
+        positions = {k: float(v) for k, v in positions.items()}
+        if not all(math.isfinite(value) for value in positions.values()):
+            raise ValueError('Nonfinite follower position')
         with self.lock:
-            self.state = {"positions": {k: float(v) for k, v in positions.items()},
-                          "timestamp": time.time(), "status": status, "source": source}
-
-    def sample(self, bus, status="Moving"):
-        # Called only by the control thread; no competing serial reads.
-        self.publish(bus.sync_read("Present_Position", num_retry=2), status)
+            self.state = {"positions": positions,
+                          "timestamp": time.time(), "status": status, "source": source,
+                          "feedback": {"command_positions": command_positions,
+                                       "tracking_error": ({k: positions[k]-float(v) for k,v in command_positions.items() if k in positions}
+                                                          if command_positions is not None else None),
+                                       "diagnostics": diagnostics,
+                                       "diagnostics_timestamp": (diagnostics_timestamp if diagnostics_timestamp is not None else time.time())
+                                       if diagnostics is not None else None}}
 
     def close(self):
         self.server.shutdown()

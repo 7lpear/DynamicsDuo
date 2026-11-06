@@ -15,6 +15,10 @@ captures/*
 !captures/board_20261029_122834_782438.png
 !captures/board_20261029_123855_712442.png
 calibration/*.png
+calibration/robot_board*.json
+calibration/robot_backups/
+calibration/robot_payload.json
+calibration/teleop_profiles/
 *_results/
 detector_benchmark/*
 !detector_benchmark/REPORT.md

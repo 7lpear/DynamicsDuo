@@ -1,175 +1,79 @@
 # SO-101 스크립트 + 실시간 3D 화면
 
-## 추종 오류 이후 수정: 부하 추정과 보수적 검증 동작
+## 리더암 텔레오퍼레이션과 3D 동기화
 
-실제 `--wide` 실행은 비활성화했습니다. 이전 중앙 자세 이동은 하중 지레팔을 늘릴 수 있습니다.
-
-```powershell
-# 읽기 전용: 관절 위치, URDF 중력 토크 추정, 전압·온도·부하·전류·상태 원시값
-.venv\Scripts\python.exe test_follower_motion.py --analyze-load
-
-# 진단 후 확인용 동작: 무부하 그리퍼, 어깨·팔꿈치·손목 굽힘을 고정
-.venv\Scripts\python.exe test_follower_motion.py --viewer --load-aware --speed 6
-```
-
-`--load-aware`는 베이스 ±8°, 손목 회전 ±10°, 그리퍼 최대 8%의 작은 확인 동작을 조합합니다.
-보정 한계 때문에 이동이 불가능한 방향은 생략하며, 중앙 자세로 이동하지 않습니다.
-모든 관절의 자세 유지 토크는 필요합니다. 정지 관절도 무부하가 아닙니다.
-각 경로를 21개 자세로 샘플링해 공식 URDF의 링크 질량·무게중심으로
-중력 위치에너지의 관절 각도 미분을 계산합니다. 이를 통해 추정 정적 중력 토크를 구합니다.
-각 관절의 시작 토크보다 0.02 Nm 넘게 증가하는 경로는 축소하거나 거부합니다.
-사용자가 제공한 30 kg.cm = 2.942 Nm은 **스톨 토크**이며 연속 토크가 아닙니다.
-모델 불확실성 계수 1.5와 스톨 토크의 20%(0.588 Nm)는 주의 메시지에만 사용합니다.
-이 비율은 제조사 정격이 아닌 설계 가정이므로 이 값만 넘었다고 실행을 차단하지 않습니다.
-불확실성 계수를 적용한 모델 추정값이 표시 최대 토크(2.942 Nm)에 도달하면 실행하지 않습니다.
-이 검사 통과는 연속 부하 용량이나 안전을 보증하지 않습니다.
-실제 모터의 연속 허용 토크, 마찰, 케이블, 추가 장착물, 외부 접촉·그리퍼 힘은 계산에 포함되지 않습니다.
-무부하 그리퍼를 전제로 합니다. 추가 무게가 있으면 먼저 모델을 수정해야 합니다.
-동작 속도는 최대 8°/초(그리퍼 %/초), 명령 가속도는 최대 10°/초²로 제한합니다.
-동적 관성·코리올리 항을 계산한 역동역학 모델은 아닙니다.
-모터를 켠 뒤 이동 전에 현재 자세 유지 오차와 전압·온도를 반복 확인합니다.
-전압과 온도는 제조사 보호 설정값과 비교하고, 켜기 전보다 전압이 10% 넘게 낮아지거나
-Status가 0이 아니거나 데이터 읽기 실패가 발생하면 중단합니다.
-위치 오차 중단 기준은 그대로 유지합니다. 오류로 토크가 해제되면 팔이 처질 수 있습니다.
-12V/3A 전원은 모든 모터가 공유합니다. 소프트웨어는 공급 전류를 늘리지 못하며,
-이 진단만으로 전원의 여유나 순간 전압 강하를 입증할 수 없습니다.
-
-현재 로그 기준 모델 추정: 어깨 약 0.153 Nm / 팔꿈치 약 0.257 Nm.
-중앙 자세는 어깨 약 0.538 Nm / 팔꿈치 약 0.453 Nm으로 증가합니다.
-이는 0.632 kg의 공식 URDF에 따른 추정값이며 실제 측정 토크가 아닙니다.
-이전에 기록한 자세와 실제 현재 자세가 다르면 계산값도 달라집니다.
-
-**아래 `--wide` 실제 실행 예시는 이제 실행되지 않습니다. 기존 모드의 설명 기록입니다.**
-
-## 넓고 빠른 다관절 시연 (--wide)
+LeRobot 기본 텔레오퍼레이션과 기존 3D 뷰어를 함께 실행합니다.
+리더 COM6 / 팔로워 COM10 기준이며, 재연결 시 포트를 확인하세요.
+저장소 루트에서 실행합니다. 같은 포트를 사용하는 다른 프로그램은 먼저 종료합니다.
 
 ```powershell
-# 가상 보정 범위로 큰 동작 미리보기 (USB 연결 없음)
-python test_follower_motion.py --simulate --wide --speed 25 --duration 90
-
-# 실제 암: 끝단 여유를 뺀 관절 범위의 70%, 최대 명령 속도 25도/초
-.venv\Scripts\python.exe test_follower_motion.py --viewer --wide
-
-# 범위를 80%로 넓히고 최대 명령 속도를 30도/초로 조절
-.venv\Scripts\python.exe test_follower_motion.py --viewer --wide --range-fraction 0.8 --speed 30
+.venv\Scripts\python.exe -m lerobot.scripts.lerobot_teleoperate --robot.type=so101_follower --robot.port=COM10 --robot.id=follower --teleop.type=so101_leader --teleop.port=COM6 --teleop.id=my_leader --teleop.calibration_dir=calibration/teleop_profiles
 ```
 
-`--wide`는 `--demo`를 포함합니다. 기본 시연의 작은 상대 각도 대신 각 관절의
-캘리브레이션 범위 중심을 기준으로 좌우 끝을 크게 왕복합니다.
-먼저 현재 자세에서 범위 중심으로 부드럽게 이동하고, 마지막에는 시작 자세로 돌아옵니다.
-6개 모터의 목표 위치를 한 번에 보내며 각 구간의 이동 시간은 가장 오래 걸리는 관절에 맞춥니다.
-몸체 관절은 보정 끝에서 약 10도(114 ticks), 그리퍼는 보정 범위의 3%를 남깁니다.
-`--range-fraction`은 이 여유를 뺀 범위의 0.2~0.85이며, 기계적 끝까지 보내지 않습니다.
-`--amplitude`는 `--wide`에서 사용하지 않습니다.
+명령 실행 시 브라우저에서 `http://127.0.0.1:8765`가 열리고 바로 텔레오퍼레이션이 시작됩니다.
+`t` 등의 시작 입력은 없습니다. 보정 파일이 맞지 않으면 LeRobot 자체 보정 절차가 표시될 수 있습니다.
+제어는 LeRobot 기본 동작을 사용하므로, 실행 전 양팔을 비슷한 자세로 두고 경로를 비우세요.
+3D 모델은 제어 루프가 이미 읽은 팔로워 실측값, 목표 열은 실제 전송 명령을 표시합니다.
+별도 USB 읽기나 중복 포트 연결은 없으며 전류·부하 진단을 추가로 읽지는 않습니다.
+Ctrl+C로 종료하면 로봇 연결과 뷰어 서버를 닫고 기본 설정에 따라 토크를 해제합니다. 팔을 받칠 준비를 하세요.
 
-속도는 3~40도/초(그리퍼는 %/초)의 **명령상 최대 속도**입니다.
-실제 속도는 USB 읽기 및 쓰기 시간과 모터 응답에 따라 더 낮습니다.
-빠른 설정에서 추종 오차가 커지면 기존 검사로 중단합니다. 오차 검사를 완화하지 않았습니다.
-넓은 범위의 관절 조합은 자체 충돌이나 책상 충돌을 일으킬 수 있으며 이를 자동으로 검출하지 않습니다.
-고정한 암 주변을 비우고, 물건을 잡지 않은 상태에서 범위와 속도를 단계적으로 올리세요.
-가상 미리보기는 실제 보정 범위·시작 자세·충돌 여부를 검증하는 기능이 아닙니다.
-종료 및 오류 시 토크 처리는 아래 기본 시연과 같습니다.
-
-## 여러 관절을 함께 움직이는 시연 모드
+현재 환경에는 연결을 적용했습니다. LeRobot을 재설치하거나 새 환경을 만들면 한 번 실행합니다.
 
 ```powershell
-# 로봇 없이 시연 동작 미리보기 (가상 기준 자세, 각 구간 5초)
-python test_follower_motion.py --simulate --demo --duration 40
-
-# 실제 로봇: DEMO 입력으로 시작
-.venv\Scripts\python.exe test_follower_motion.py --viewer --demo
-
-# 더 큰 동작, 두 번 반복 (기본 이동량의 1.3배)
-.venv\Scripts\python.exe test_follower_motion.py --viewer --demo --amplitude 1.3 --cycles 2
+.venv\Scripts\python.exe setup_lerobot_viewer.py
 ```
 
-시연은 시작 자세를 기준으로 좌우 회전 → 굽힘/펼침 → 손목 흔들기 → 시작 자세 복귀를 수행합니다.
-기본 이동량은 베이스 ±25°, 어깨 ±15°, 팔꿈치 ±25°, 손목 굽힘 ±25°,
-손목 회전 ±45°, 그리퍼 ±25%입니다. 두 끝 사이 이동량은 이 값의 두 배입니다.
-보정 범위에 맞춰 각 관절의 이동량을 줄입니다. 시작 자세가 한계 근처라면
-그 관절은 여유가 있는 방향으로만 왕복합니다(닫힌 그리퍼도 열고 다시 닫습니다).
-보정 범위 밖의 시작 위치나 사용 가능한 이동 범위가 부족한 보정값이면 중단합니다.
-끝에서는 실행 당시 자세로 정확히 돌아가며, 실제 동작 방향과 범위는 시작 자세에 따라 달라집니다.
-`--amplitude` 범위는 0.2~1.5, `--speed` 범위는 3~40 (기본 최대 12°/초, 그리퍼 %/초),
-`--cycles`는 1~5입니다. `--demo`에서는 `--joint` 대신 전체 6개 관절을 사용합니다.
+선택 옵션: `--follower_viewer=false`로 뷰어를 끄고, `--follower_viewer_browser=false`로 브라우저 자동 열기를 끄거나,
+`--follower_viewer_port=8766`으로 포트를 바꿀 수 있습니다. `--display_data`는 LeRobot 자체 시각화 옵션입니다.
 
-실제 암을 처음 실행하기 전에 주변 공간을 비우고, 물건을 집지 않은 상태에서 시작하세요.
-관절 보정 한계와 추종 오차를 검사하지만 책상·주변 물건 및 자체 충돌을 자동으로 검출하지는 않습니다.
-동작 중 모든 관절이 자세를 유지합니다. 정상 종료 시 시작 자세를 유지하다가
-팔을 받치고 Enter를 누르면 전체 토크가 해제됩니다. `--auto`도 종료 시 이 입력은 생략하지 않습니다.
-Ctrl+C 또는 오류 발생 시에는 즉시 전체 토크를 해제하므로 팔이 처질 수 있습니다.
-미리보기는 가상 기준 자세이고 실제 동작은 실행 당시 자세와 보정 범위에 따라 달라집니다.
+뷰어는 각 루프의 `get_observation()`에서 읽은 엔코더 값을 사용합니다.
+명령 전송 직전 관측이며, 목표값을 실제 위치로 대신 표시하지 않습니다.
+몸체 관절은 도, 그리퍼는 %입니다. `use_degrees=false`일 때도 표시만 도 단위로 변환하고 제어 명령은 그대로 둡니다.
 
-기존 관절별 테스트 명령은 아래와 같이 계속 사용할 수 있습니다.
+리더·팔로워 읽기의 `ConnectionError`에 한해 최대 3회(첫 시도 포함)까지 재시도합니다.
+0.25초가 지나면 추가 시도를 시작하지 않으며 개별 SDK 읽기 시간은 별도입니다.
+이전 관측으로 움직임을 계속하거나 쓰기 명령을 재전송하지 않습니다. 재시도 중에는 새 움직임 명령을 보내지 않습니다.
+계속 실패하면 기본 종료 처리를 수행합니다. 반복 오류 시 `--fps=30`과 USB·모터 연결 상태를 확인하세요.
 
-리더암 없이 `test_follower_motion.py`가 실제 팔로워 관절 위치를 읽어
-`http://127.0.0.1:8765`의 3D 모델에 표시합니다.
-LeLab 자체 화면이 아닌 별도 로컬 뷰어이며, 공식 LeLab의 SO-101 URDF와 관절 매핑을 사용합니다.
-다운로드된 모델 및 JavaScript는 로컬에서 제공되어 설치 후 인터넷 없이 동작합니다.
+관절 보정에는 기존 `calibrate_leader.py --port COM6` 및
+`calibrate_follower.py --port COM10 --robot-id follower` 도구를 사용합니다.
+기존 캘리브레이션과 장비 백업은 유지하며 별도 자세 대응 오프셋 파일은 사용하지 않습니다.
+설치 스크립트는 알려진 소스 구조에만 연결을 적용하고, 원본은
+`logs/lerobot_teleoperate.original.py`에 보관합니다. SDK 재설치 시 다시 적용하세요.
 
-## 로봇 없이 먼저 화면 확인
+## 읽기 전용 실시간 관측
+
+텔레오퍼레이션을 종료한 뒤 실행합니다. 동일 COM 포트를 동시에 열 수는 없습니다.
 
 ```powershell
-python setup_viewer.py  # 모델 파일이 이미 있으면 생략
-python test_follower_motion.py --simulate --duration 60
+.venv\Scripts\python.exe monitor_follower.py --port COM10 --robot-id follower --duration 300
 ```
 
-브라우저가 자동으로 열립니다. 이 모드는 LeRobot을 불러오거나 USB에 연결하지 않습니다.
-가상 데이터라고 화면에 표시됩니다.
+팔로워 각도와 전압·온도·전류/부하 원시값·상태를 표시합니다. 현재 토크 상태를 바꾸지 않으므로
+토크가 꺼져 있다면 팔을 받쳐 주세요. `--fps` 기본 10Hz, 진단값은 약 0.5초마다 읽습니다.
+`--no-browser`로 자동 브라우저 열기를 끄고 `--viewer-port`로 HTTP 포트를 바꿀 수 있습니다.
+`--duration` 또는 Ctrl+C로 끝나며, 연결 해제 시에도 토크 상태를 유지합니다.
+관절 엔코더 위치를 시각화하는 도구로, 카메라 질량 추정이나 물리적 처짐 계산은 하지 않습니다.
 
-## 실제 팔로워 테스트
-
-프로젝트 전용 `.venv`에 LeRobot 0.6.0과 Feetech SDK를 설치했습니다.
-기존 `follower` 캘리브레이션의 6개 관절을 확인했으며 USB 연결은 하지 않았습니다.
-바로 실행할 수 있습니다:
+한 번만 상태를 읽어 JSON으로 출력하려면 다음을 사용합니다.
 
 ```powershell
-.venv\Scripts\python.exe test_follower_motion.py --viewer --joint shoulder_pan
+.venv\Scripts\python.exe -m gomoku_robot read-state --port COM10 --robot-id follower
 ```
 
-기본 포트는 COM6, 캘리브레이션 ID는 follower입니다.
-다르다면 `--port COM7 --robot-id <기존 ID>`로 지정합니다.
-캘리브레이션 파일은 기존 LeRobot 캐시에서 읽으며 새로 보정하거나 모터에 보정값을 쓰지 않습니다.
-파일이 없거나 모터 보정과 일치하지 않으면 중단됩니다.
-
-`MOVE` 입력 시 선택한 관절이 최대 10도 왕복합니다(그리퍼는 보정 범위의 최대 10%).
-전체 관절 실제 위치를 약 10~20Hz로 표시합니다. USB 읽기 시간에 따라 속도는 달라집니다.
-그리퍼의 0~100%를 Jaw 각도로 바꾸는 방식은 LeLab과 같으며 실제 개구 폭의 정밀 측정은 아닙니다.
-
-프롬프트 없이 기존 왕복 테스트를 실행하려면:
+## 로봇 없이 뷰어 검사
 
 ```powershell
-.venv\Scripts\python.exe test_follower_motion.py --viewer --joint shoulder_pan --auto
+.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.venv\Scripts\python.exe verify_viewer.py
 ```
 
-이것은 기존의 **관절 하나씩 테스트**를 자동 실행하는 옵션입니다.
-다른 관절은 토크 OFF이므로 팔을 받쳐야 합니다. 전체 팔을 스스로 지지하는 자동 안무는 포함하지 않습니다.
-테스트 후 해당 관절도 토크가 해제됩니다. 시작 전 팔을 받치고 관절과 그리퍼에 손을 넣지 마세요.
-중단은 터미널에서 Ctrl+C. 종료 시 뷰어 서버도 닫힙니다.
+Microsoft Edge를 headless로 열어 가상 관측값의 위치·목표·진단 표시와 데이터 정지 상태를 검사합니다.
+USB와 LeRobot 모터 제어를 사용하지 않습니다. 결과 화면은 `logs/viewer-verified.png`에 저장합니다.
 
-LeLab의 Teleoperation / Recording / Calibration 등 COM6을 사용하는 기능은 중지한 뒤 실행하세요.
-뷰어는 USB를 열지 않고, 모터 명령을 쓰는 기능도 없습니다.
-대기 프롬프트에서는 위치가 갱신되지 않으며 마지막 읽기 이후 1초가 지나면 대기/정지 표시가 뜹니다.
+## 외부 자료
 
-## 다른 동작 스크립트에서 사용
-
-```python
-from follower_viewer import FollowerViewer
-
-viewer = FollowerViewer()
-try:
-    # 기존 제어 루프에서 명령 후, 같은 스레드에서 실행
-    viewer.sample(robot.bus, "동작 실행 중")
-finally:
-    viewer.close()
-```
-
-로봇 연결, 토크와 종료 처리는 원래 제어 스크립트가 관리합니다.
-별도 스레드에서 모터 버스를 읽지 않습니다. 읽기 오류는 원래 제어 루프로 전달되므로 중단 처리를 유지하세요.
-
-## 출처
-
-- 모델 및 매핑: https://github.com/huggingface/leLab
-- Three.js 0.180.0: https://github.com/mrdoob/three.js
-- 다운로드 revision: `viewer/assets-version.json`
-- 라이선스: `viewer/LELAB-LICENSE.txt`, `viewer/vendor/LICENSE.txt`
+URDF와 관절 매핑은 [LeLab](https://github.com/huggingface/leLab), 렌더링은
+[Three.js](https://github.com/mrdoob/three.js)를 사용합니다. 다운로드 버전은 `viewer/assets-version.json`,
+라이선스는 `viewer/LELAB-LICENSE.txt`와 `viewer/vendor/LICENSE.txt`에 있습니다.
+모델과 JavaScript는 로컬에서 제공됩니다. 파일이 없는 경우 `python setup_viewer.py`로 준비합니다.

@@ -55,9 +55,27 @@ try{
    for(const [motor,value]of Object.entries(state.positions)){
     const j=joints[mapping[motor]];if(!j)continue;
     // Same mapping as LeLab: degrees -> radians; gripper 0..100 -> Jaw.
-    const angle=THREE.MathUtils.clamp(value*Math.PI/180,j.low,j.high);j.pivot.quaternion.setFromAxisAngle(j.axis,angle);
+    // Show measured angles without substituting requested targets.
+    const angle=value*Math.PI/180;j.pivot.quaternion.setFromAxisAngle(j.axis,angle);
    }
-   document.querySelector('#positions').replaceChildren(...Object.keys(mapping).map(key=>{const row=document.createElement('tr'),label=document.createElement('td'),value=document.createElement('td');label.textContent=labels[key];value.textContent=state.positions[key]===undefined?'—':state.positions[key].toFixed(1)+(key==='gripper'?' %':'°');row.append(label,value);return row;}));
+   const feedback=state.feedback;
+   document.querySelector('#positions').replaceChildren(...Object.keys(mapping).map(key=>{
+    const row=document.createElement('tr'),label=document.createElement('td');label.textContent=labels[key];row.append(label);
+    for(const value of [state.positions[key],feedback?.command_positions?.[key],feedback?.tracking_error?.[key]]){
+     const cell=document.createElement('td');cell.textContent=value===undefined?'—':value.toFixed(2);row.append(cell);
+    }return row;
+   }));
+   const diagnosticAge=feedback?.diagnostics_timestamp?Date.now()/1000-feedback.diagnostics_timestamp:Infinity;
+   document.querySelector('#feedback-status').textContent=(feedback?.command_positions?'LeRobot 목표 명령 수신 · ':'읽기 전용 · ')
+    +(Number.isFinite(diagnosticAge)?`전류·부하 관측 ${diagnosticAge.toFixed(1)}초 전`:'전류·부하 미수집');
+   document.querySelector('#feedback-status').style.color=Number.isFinite(diagnosticAge)&&diagnosticAge>2.5?'#ffb499':'#71dbb3';
+   document.querySelector('#electrical tbody').replaceChildren(...Object.keys(mapping).map(key=>{
+    const row=document.createElement('tr'),label=document.createElement('td');label.textContent=labels[key];row.append(label);
+    for(const field of ['voltage_v','temperature_c','load_raw','current_raw','status']){
+     const value=feedback?.diagnostics?.[key]?.[field],cell=document.createElement('td');
+     cell.textContent=value===undefined?'—':field==='voltage_v'?value.toFixed(1):String(value);row.append(cell);
+    }return row;
+   }));
   }catch(error){status.textContent='스크립트 연결 끊김';status.style.color='#ffb499';}
   setTimeout(poll,100);
  };poll();

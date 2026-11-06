@@ -1,0 +1,4 @@
+# Native CLI integration is verified against this LeRobot source layout.
+lerobot[feetech]==0.6.0
+feetech-servo-sdk==1.0.0
+numpy==2.2.6

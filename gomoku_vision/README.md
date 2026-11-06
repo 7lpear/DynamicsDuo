@@ -1,5 +1,17 @@
 # 오목판 카메라 인식
 
+자주 쓰는 카메라·로봇·보정·검증 명령은 [루트 README의 실행 명령어 모음](../README.md#실행-명령어-모음)에 정리되어 있습니다.
+
+리더암 조작과 팔로워 실측 3D 뷰어를 함께 실행하려면 저장소 루트에서 사용합니다.
+
+```powershell
+.venv\Scripts\python.exe -m lerobot.scripts.lerobot_teleoperate --robot.type=so101_follower --robot.port=COM10 --robot.id=follower --teleop.type=so101_leader --teleop.port=COM6 --teleop.id=my_leader --teleop.calibration_dir=calibration/teleop_profiles
+```
+
+명령 실행 즉시 텔레오퍼레이션과 브라우저 뷰어가 시작됩니다. 별도 `t` 입력은 없습니다.
+실행 전 양팔을 비슷한 자세로 두고 경로를 비우세요. Ctrl+C로 종료하며 팔을 받칠 준비를 합니다.
+자세한 옵션과 새 환경 연결 방법은 [로봇 조작 안내](../README.md#리더암-조작과-3d-동기화)를 참고하세요.
+
 Windows의 Conda `so-arm-101` 환경에서 실행할 때는 저장소 루트에서 다음을 사용합니다.
 
 ```powershell
@@ -136,6 +148,10 @@ python gomoku_vision/board_camera.py --camera 1 --size 19 --reset
 ```
 
 ## 검증
+
+인식한 교점을 로봇 좌표에 연결하는 다음 단계는
+[판–로봇 좌표 보정과 접근 경로 준비](../gomoku_robot/README.md)를 참고하세요.
+카메라 원근 보정과 로봇 XYZ 보정은 별개입니다.
 
 ```sh
 python -m unittest discover -s gomoku_vision -p "test_*.py" -v
