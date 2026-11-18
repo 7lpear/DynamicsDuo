@@ -1,0 +1,18 @@
+{
+  "archive": "gomoku_white_center_18_clean.zip",
+  "sha256": "bdaab5482cd347bd8fce6ef219fd9ccc8c125dd59d2dfe683aa03bf028741b4a",
+  "dataset_name": "gomoku_white_center_18_clean",
+  "total_episodes": 18,
+  "total_frames": 10794,
+  "fps": 30,
+  "source_dataset": "gomoku_white_center_20_20261117_213044",
+  "excluded_original_episode_indices": [
+    6,
+    18
+  ],
+  "episode_indexing": "zero-based; retained episodes were renumbered 0 through 17",
+  "task": "Pick up the white stone from the supply and place it at the center intersection of the board.",
+  "robot": "SO-101 follower, 5 arm joints and gripper, degree-based arm positions",
+  "camera": "top, RGB 640x480 at 30 fps",
+  "scope": "One fixed pick-and-place task; does not train arbitrary board coordinates or AlphaZero decisions."
+}

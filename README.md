@@ -41,6 +41,7 @@ python calibrate_board.py captures/새로저장한빈판사진.png
 
 ## 문서와 현재 진행 상태
 
+- [SmolVLA 학습과 다른 컴퓨터로 옮기기](smolvla/README.md) — 흰 돌 시연 18개, CUDA 설치, 학습, Mac 실행
 - [OpenCV 오목판·흑백 돌 인식 사용법](gomoku_vision/README.md)
 - [실시간 탐지 사용법](LIVE_DINO.md)
 - [탐지 모델 비교 결과](detector_benchmark/REPORT.md)
@@ -64,6 +65,7 @@ YOLO 비교에만 필요한 ultralytics는 experiments/requirements.txt로 분�
 
 빈 판과 백돌 배치 샘플 2장을 captures/에 포함했습니다. 얼굴 테스트 사진,
 새 촬영 이미지, 모델 가중치, 가상환경, 실행 결과는 Git에서 제외합니다.
+SmolVLA 학습용 흰 돌 시연 18개는 별도 복사하며, 데이터와 모델 가중치는 Git에 포함하지 않습니다.
 다운로드 모델의 이용 조건은 각 모델 제공자의 라이선스를 따릅니다.
 뷰어에 포함된 외부 자료는 viewer/의 라이선스 파일을 참고하세요.
 
