@@ -161,6 +161,42 @@ lerobot-replay --robot.type=so101_follower --robot.port=/dev/tty.usbserial-120 -
 
 ## 기존 녹화 데이터 준비와 검사
 
+### 50개 녹화 ZIP을 사용하는 경우
+
+`gomoku_white_center_50_all.zip`처럼 새로 녹화한 데이터는 `--archive`로 지정합니다.
+기존 18개 데이터셋의 파일명으로 바꾸거나 체크섬을 수정할 필요가 없습니다.
+다음은 `smolvla/` 폴더 안에서 실행하는 명령입니다.
+
+```sh
+git pull --ff-only
+python run.py prepare --archive datasets/gomoku_white_center_50_all.zip
+python run.py check --dataset data/gomoku_white_center_50_all --device auto
+```
+
+ZIP 안의 `meta/info.json`에서 데이터셋 폴더명·에피소드 수·프레임 수를 읽고,
+`smolvla/data/gomoku_white_center_50_all/`에 압축을 풉니다.
+Mac의 `._` 파일과 `__MACOSX` 폴더는 제외합니다. 원본 ZIP은 유지하며 기존 데이터는 덮어쓰지 않습니다.
+사용자 지정 ZIP의 SHA-256은 계산해 출력하고 출처 기록을 남깁니다.
+이는 해당 ZIP의 모든 시연이 성공했다는 검증이나 기존 18개 데이터의 품질 인증을 뜻하지 않습니다.
+기존 원본 20개 중 제외했던 번호 6·18을 새 데이터셋에 자동 적용하지 않습니다.
+
+점검이 통과하면 같은 `smolvla/` 폴더에서 10스텝을 시험합니다.
+
+```sh
+python run.py train --dataset data/gomoku_white_center_50_all --device auto --steps 10 --batch-size 1 --output outputs/white_center_50_smoke
+```
+
+시험이 끝나면 새 출력 폴더에서 첫 미세조정을 진행합니다.
+
+```sh
+python run.py train --dataset data/gomoku_white_center_50_all --device auto --steps 5000 --batch-size 4 --output outputs/white_center_50_v1
+```
+
+아래의 기본 명령은 기존 18개 데이터셋을 대상으로 합니다. 다른 데이터셋의 검사·학습에는
+`--dataset`으로 준비된 폴더를 계속 지정해야 합니다.
+
+### 기존 18개 녹화 ZIP을 사용하는 경우
+
 시연 영상은 GitHub에 포함하지 않습니다. 원래 Mac의 데이터를 별도로 복사해야 합니다.
 Mac에서 이전에 만든 `gomoku_white_center_18_clean.zip`에는 macOS 메타데이터가 들어갈 수 있으므로,
 이번 작업 폴더에서 준비한 다음 ZIP을 옮기세요.

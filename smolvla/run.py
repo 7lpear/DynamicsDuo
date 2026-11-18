@@ -8,7 +8,8 @@ from datetime import datetime
 import hashlib
 from importlib.metadata import version
 import json
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+import stat
 import shlex
 import shutil
 import subprocess
@@ -22,43 +23,87 @@ DATASET_NAME = "gomoku_white_center_18_clean"
 DATASET = BASE / "data" / DATASET_NAME
 
 
-def read_info(root):
+def read_info(root, expected=None):
     info = json.loads((root / "meta" / "info.json").read_text(encoding="utf-8"))
     for directory in ("data", "meta", "videos"):
         if not (root / directory).is_dir():
             raise ValueError(f"Missing dataset directory: {root / directory}")
-    if info["total_episodes"] != 18 or info["total_frames"] != 10794:
-        raise ValueError("Expected the bundled clean dataset: 18 episodes, 10794 frames")
+    for key in ("total_episodes", "total_frames", "fps"):
+        if not isinstance(info.get(key), (int, float)) or info[key] <= 0:
+            raise ValueError(f"Invalid dataset metadata: {key}={info.get(key)}")
+    if expected:
+        for key in ("total_episodes", "total_frames", "fps"):
+            if info[key] != expected[key]:
+                raise ValueError(f"Dataset {key} mismatch: expected {expected[key]}, found {info[key]}")
     if "observation.images.top" not in info["features"]:
         raise ValueError("Dataset must contain the top camera")
     return info
 
 
-def prepare_dataset():
+def prepare_dataset(archive_path=None):
     manifest = json.loads((BASE / "datasets" / "manifest.json").read_text(encoding="utf-8"))
-    archive = BASE / "datasets" / manifest["archive"]
+    default_archive = BASE / "datasets" / manifest["archive"]
+    archive = Path(archive_path).expanduser().resolve() if archive_path else default_archive.resolve()
     if not archive.is_file():
         raise FileNotFoundError(f"Copy the recording ZIP from the recording computer to {archive}; see smolvla/README.md")
     with archive.open("rb") as stream:
         digest = hashlib.file_digest(stream, "sha256").hexdigest()
-    if digest != manifest["sha256"]:
+    known_archive = archive == default_archive.resolve()
+    if known_archive and digest != manifest["sha256"]:
         raise ValueError("Dataset archive checksum mismatch; fetch the branch again")
-    if DATASET.exists():
-        read_info(DATASET)
-        print(f"Dataset already prepared: {DATASET}")
-        return
-    DATASET.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(dir=DATASET.parent) as temporary:
+    print(f"Archive SHA-256: {digest}")
+    data_parent = BASE / "data"
+    data_parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=data_parent) as temporary:
         destination = Path(temporary)
         with zipfile.ZipFile(archive) as zipped:
+            members = []
             for entry in zipped.infolist():
+                parts = PurePosixPath(entry.filename).parts
+                if any(part in ("__MACOSX", ".DS_Store") or part.startswith("._") for part in parts):
+                    continue
+                if "\\" in entry.filename or any(part == ".." or ":" in part for part in parts):
+                    raise ValueError(f"Unsafe archive path: {entry.filename}")
                 target = (destination / entry.filename).resolve()
                 if not target.is_relative_to(destination.resolve()):
                     raise ValueError(f"Unsafe archive path: {entry.filename}")
-            zipped.extractall(destination)
-        read_info(destination / DATASET_NAME)
-        shutil.move(str(destination / DATASET_NAME), str(DATASET))
-    print(f"Dataset prepared: {DATASET}")
+                if stat.S_ISLNK(entry.external_attr >> 16):
+                    raise ValueError(f"Archive symlink is not supported: {entry.filename}")
+                members.append(entry)
+            infos = [PurePosixPath(e.filename) for e in members
+                     if not e.is_dir() and PurePosixPath(e.filename).parts[-2:] == ("meta", "info.json")]
+            if len(infos) != 1:
+                raise ValueError(f"ZIP must contain exactly one dataset meta/info.json; found {len(infos)}")
+            prefix = infos[0].parent.parent
+            name = prefix.name if prefix != PurePosixPath(".") else archive.stem
+            if not name or name in (".", ".."):
+                raise ValueError("Cannot determine dataset folder name")
+            output = data_parent / name
+            expected = json.loads(zipped.read(str(infos[0])))
+            if output.exists():
+                read_info(output, expected)
+                receipt = output / "source_archive.json"
+                if receipt.is_file():
+                    if json.loads(receipt.read_text())["sha256"] != digest:
+                        raise FileExistsError(f"Existing dataset came from another ZIP: {output}")
+                elif not known_archive:
+                    raise FileExistsError(f"Existing dataset has no archive receipt; choose a different ZIP root or move it aside: {output}")
+                print(f"Dataset already prepared: {output}")
+                return output
+            zipped.extractall(destination, members=members)
+        extracted = destination / prefix
+        info = read_info(extracted, manifest if known_archive else None)
+        (extracted / "source_archive.json").write_text(json.dumps({
+            "archive": archive.name,
+            "sha256": digest,
+            "total_episodes": info["total_episodes"],
+            "total_frames": info["total_frames"],
+            "known_manifest": known_archive,
+        }, indent=2) + "\n")
+        shutil.move(str(extracted), str(output))
+    print(f"Dataset prepared: {output}")
+    print(f"Episodes: {info['total_episodes']}, frames: {info['total_frames']}")
+    return output
 
 
 def resolve_device(requested):
@@ -101,7 +146,7 @@ def check_dataset(root):
     info = read_info(root)
     table = pq.read_table(sorted((root / "meta" / "episodes").rglob("*.parquet")))
     indices = table["episode_index"].to_pylist()
-    if sorted(indices) != list(range(18)):
+    if sorted(indices) != list(range(info["total_episodes"])):
         raise ValueError(f"Unexpected episode indices: {indices}")
     if sum(table["length"].to_pylist()) != info["total_frames"]:
         raise ValueError("Episode lengths do not match total_frames")
@@ -125,7 +170,7 @@ def training_command(args, device):
     return [
         sys.executable, "-m", "lerobot.scripts.lerobot_train",
         "--policy.path=lerobot/smolvla_base",
-        f"--dataset.repo_id=local/{DATASET_NAME}",
+        f"--dataset.repo_id=local/{root.name}",
         f"--dataset.root={root}",
         "--dataset.video_backend=pyav",
         '--rename_map={"observation.images.top":"observation.images.camera1"}',
@@ -187,7 +232,8 @@ def export_model(args):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
-    commands.add_parser("prepare", help="Verify and unpack the separately copied 18-episode dataset")
+    preparation = commands.add_parser("prepare", help="Unpack a recording ZIP; defaults to the verified 18-episode archive")
+    preparation.add_argument("--archive", type=Path, help="Recording ZIP, e.g. datasets/gomoku_white_center_50_all.zip")
     check = commands.add_parser("check", help="Check packages, actual GPU computation, and local dataset")
     check.add_argument("--device", choices=["auto", "cuda", "mps", "cpu"], default="auto")
     check.add_argument("--dataset", type=Path, default=DATASET)
@@ -203,7 +249,7 @@ def main():
     exporting.add_argument("--output", type=Path, default=BASE / "exports" / "gomoku_smolvla.zip")
     args = parser.parse_args()
     if args.command == "prepare":
-        prepare_dataset()
+        prepare_dataset(args.archive)
     elif args.command == "check":
         check_runtime(args.device)
         check_dataset(args.dataset.expanduser().resolve())
