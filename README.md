@@ -42,6 +42,7 @@ python calibrate_board.py captures/새로저장한빈판사진.png
 ## 문서와 현재 진행 상태
 
 - [SmolVLA 학습과 다른 컴퓨터로 옮기기](smolvla/README.md) — 흰 돌 시연 18개, CUDA 설치, 학습, Mac 실행
+- [시연 녹화와 그대로 재생](smolvla/README.md#시연-녹화와-그대로-재생) — 포트·보정, 카메라 원격 조작, 1회/20회 녹화, 저장 경로, 학습 없는 동작 재생
 - [OpenCV 오목판·흑백 돌 인식 사용법](gomoku_vision/README.md)
 - [실시간 탐지 사용법](LIVE_DINO.md)
 - [탐지 모델 비교 결과](detector_benchmark/REPORT.md)
